@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.bitget_client import fetch_history_candles
-from src.config import CATEGORY, INTERVAL, OUTPUT_DIR
+from src.config import CATEGORY, INTERVAL, LIMIT_PER_REQUEST, OUTPUT_DIR
 
 
 INTERVAL_MS = {
@@ -60,31 +60,71 @@ def candles_to_dataframe(candles: list) -> pd.DataFrame:
         ]
     ]
 
-
 symbol = "BTCUSDT"
 
-end_ms = now_closed_candle_ms(INTERVAL)
-start_ms = end_ms - 10 * INTERVAL_MS[INTERVAL]
+def download_ohlcv(
+    symbol: str,
+    interval: str,
+    first_bar: datetime,
+    last_bar: datetime,
+) -> tuple[Path, int]:
+    symbol = symbol.upper()
 
-candles = fetch_history_candles(
-    category=CATEGORY,
-    symbol=symbol,
-    interval=INTERVAL,
-    start_time_ms=start_ms,
-    end_time_ms=end_ms,
-    limit=10,
-)
+    start_ms = int(first_bar.replace(tzinfo=timezone.utc).timestamp() * 1000)
+    end_ms = int(last_bar.replace(tzinfo=timezone.utc).timestamp() * 1000)
 
-df = candles_to_dataframe(candles)
+    step_ms = INTERVAL_MS[interval]
+    cursor_ms = start_ms
+    all_candles = []
 
-Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    while cursor_ms <= end_ms:
+        chunk_last_ms = min(
+            cursor_ms + (LIMIT_PER_REQUEST - 1) * step_ms,
+            end_ms,
+        )
 
-first_bar = df["datetime_utc"].iloc[0].strftime("%Y-%m-%d(%H-%M-%S)")
-last_bar = df["datetime_utc"].iloc[-1].strftime("%Y-%m-%d(%H-%M-%S)")
+        candles = fetch_history_candles(
+            category=CATEGORY,
+            symbol=symbol,
+            interval=interval,
+            start_time_ms=cursor_ms - step_ms,
+            end_time_ms=chunk_last_ms + step_ms,
+            limit=LIMIT_PER_REQUEST,
+        )
 
-filename = f"Chart-0_{symbol}_{INTERVAL}_{first_bar}_{last_bar}.csv"
-output_path = Path(OUTPUT_DIR) / filename
+        all_candles.extend(
+            candle
+            for candle in candles
+            if cursor_ms <= int(candle[0]) <= chunk_last_ms
+        )
 
-df.to_csv(output_path, index=False, mode="w")
+        cursor_ms = chunk_last_ms + step_ms
 
-print(f"OK: saved {len(df)} rows to {output_path}")
+    df = candles_to_dataframe(all_candles)
+
+    df = (
+        df.drop_duplicates(subset=["time"])
+        .sort_values("time")
+        .reset_index(drop=True)
+    )
+
+    Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+
+    first_name = df["datetime_utc"].iloc[0].strftime("%Y-%m-%d(%H-%M-%S)")
+    last_name = df["datetime_utc"].iloc[-1].strftime("%Y-%m-%d(%H-%M-%S)")
+
+    filename = f"Chart-0_{symbol}_{interval}_{first_name}_{last_name}.csv"
+    output_path = Path(OUTPUT_DIR) / filename
+
+    df.to_csv(output_path, index=False, mode="w")
+
+    return output_path, len(df)
+
+
+if __name__ == "__main__":
+    download_ohlcv(
+        symbol="BTCUSDT",
+        interval="1m",
+        first_bar=datetime(2026, 6, 1, 0, 0),
+        last_bar=datetime(2026, 6, 11, 23, 59),
+    )

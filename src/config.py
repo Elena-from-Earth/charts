@@ -1,9 +1,10 @@
+# src/config.py
+
 BASE_URL = "https://api.bitget.com"
 
 CATEGORY = "USDT-FUTURES"
 INTERVAL = "1m"
-LIMIT_PER_REQUEST = 1000
-BARS_PER_SYMBOL = 100_000
+LIMIT_PER_REQUEST = 100
 
 SYMBOLS = [
     "BTCUSDT",
