@@ -85,7 +85,18 @@ def submit() -> None:
         status_var.set("Error: invalid dates")
         return
 
+    progress_var.set(10)
+    progress_text_var.set("10%")
     status_var.set("Downloading...")
+
+    def update_progress(value: int) -> None:
+        root.after(
+            0,
+            lambda: (
+                progress_var.set(value),
+                progress_text_var.set(f"{value}%"),
+            ),
+        )
 
     def run_download() -> None:
         try:
@@ -94,6 +105,7 @@ def submit() -> None:
                 interval=timeframe,
                 first_bar=first_bar,
                 last_bar=last_bar,
+                progress_callback=update_progress,
             )
 
             root.after(
@@ -104,9 +116,13 @@ def submit() -> None:
             )
 
         except Exception as error:
+            error_text = str(error)
+
             root.after(
                 0,
-                lambda: status_var.set(f"Error: {error}"),
+                lambda: status_var.set(
+                    f"Error: {error_text}"
+                ),
             )
 
     threading.Thread(
@@ -138,6 +154,8 @@ last_bar_var = tk.StringVar(
 )
 
 estimate_var = tk.StringVar()
+progress_var = tk.DoubleVar(value=0)
+progress_text_var = tk.StringVar(value="0%")
 status_var = tk.StringVar()
 
 ttk.Label(root, text="Trading pair").grid(
@@ -176,12 +194,49 @@ ttk.Label(root, textvariable=estimate_var, justify="left").grid(
     row=4, column=0, columnspan=2, padx=10, pady=10, sticky="w"
 )
 
-ttk.Button(root, text="Download", command=submit).grid(
-    row=5, column=0, columnspan=2, pady=12
+ttk.Progressbar(
+    root,
+    variable=progress_var,
+    maximum=100,
+    length=260,
+).grid(
+    row=5,
+    column=0,
+    columnspan=2,
+    padx=10,
+    pady=(5, 0),
 )
 
-ttk.Label(root, textvariable=status_var).grid(
-    row=6, column=0, columnspan=2, padx=10, pady=8
+ttk.Label(
+    root,
+    textvariable=progress_text_var,
+).grid(
+    row=6,
+    column=0,
+    columnspan=2,
+    pady=(2, 5),
+)
+
+ttk.Button(
+    root,
+    text="Download",
+    command=submit,
+).grid(
+    row=7,
+    column=0,
+    columnspan=2,
+    pady=12,
+)
+
+ttk.Label(
+    root,
+    textvariable=status_var,
+).grid(
+    row=8,
+    column=0,
+    columnspan=2,
+    padx=10,
+    pady=8,
 )
 
 for variable in [

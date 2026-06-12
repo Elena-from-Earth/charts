@@ -9,6 +9,15 @@ from src.config import CATEGORY, INTERVAL, LIMIT_PER_REQUEST, OUTPUT_DIR
 
 INTERVAL_MS = {
     "1m": 60_000,
+    "3m": 180_000,
+    "5m": 300_000,
+    "15m": 900_000,
+    "30m": 1_800_000,
+    "1H": 3_600_000,
+    "4H": 14_400_000,
+    "6H": 21_600_000,
+    "12H": 43_200_000,
+    "1D": 86_400_000,
 }
 
 
@@ -67,6 +76,7 @@ def download_ohlcv(
     interval: str,
     first_bar: datetime,
     last_bar: datetime,
+    progress_callback=None,
 ) -> tuple[Path, int]:
     symbol = symbol.upper()
 
@@ -74,8 +84,17 @@ def download_ohlcv(
     end_ms = int(last_bar.replace(tzinfo=timezone.utc).timestamp() * 1000)
 
     step_ms = INTERVAL_MS[interval]
+    total_bars = ((end_ms - start_ms) // step_ms) + 1
+    total_requests = (
+        total_bars + LIMIT_PER_REQUEST - 1
+    ) // LIMIT_PER_REQUEST
+
     cursor_ms = start_ms
+    completed_requests = 0
     all_candles = []
+
+    if progress_callback:
+        progress_callback(10)
 
     while cursor_ms <= end_ms:
         chunk_last_ms = min(
@@ -99,6 +118,13 @@ def download_ohlcv(
         )
 
         cursor_ms = chunk_last_ms + step_ms
+        completed_requests += 1
+
+        if progress_callback:
+            progress = 10 + int(
+                90 * completed_requests / total_requests
+            )
+            progress_callback(min(progress, 100))
 
     df = candles_to_dataframe(all_candles)
 
@@ -110,13 +136,23 @@ def download_ohlcv(
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
-    first_name = df["datetime_utc"].iloc[0].strftime("%Y-%m-%d(%H-%M-%S)")
-    last_name = df["datetime_utc"].iloc[-1].strftime("%Y-%m-%d(%H-%M-%S)")
+    first_name = df["datetime_utc"].iloc[0].strftime(
+        "%Y-%m-%d(%H-%M-%S)"
+    )
+    last_name = df["datetime_utc"].iloc[-1].strftime(
+        "%Y-%m-%d(%H-%M-%S)"
+    )
 
-    filename = f"Chart-0_{symbol}_{interval}_{first_name}_{last_name}.csv"
+    filename = (
+        f"Chart-0_{symbol}_{interval}_"
+        f"{first_name}_{last_name}.csv"
+    )
     output_path = Path(OUTPUT_DIR) / filename
 
     df.to_csv(output_path, index=False, mode="w")
+
+    if progress_callback:
+        progress_callback(100)
 
     return output_path, len(df)
 

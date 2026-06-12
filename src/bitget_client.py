@@ -11,8 +11,11 @@ def get_json(url: str, params: dict) -> dict:
 
     response = requests.get(url, params=params, timeout=20)
 
+    if response.status_code == 403:
+        raise RuntimeError("IP blocked or access forbidden by Bitget")
+
     if response.status_code == 429:
-        raise RuntimeError("Rate limit: HTTP 429 Too Many Requests")
+        raise RuntimeError("Bitget rate limit exceeded. IP may be temporarily restricted")
 
     response.raise_for_status()
 
