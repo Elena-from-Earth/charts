@@ -1,0 +1,16 @@
+BASE_URL = "https://api.bitget.com"
+
+CATEGORY = "USDT-FUTURES"
+INTERVAL = "1m"
+LIMIT_PER_REQUEST = 1000
+BARS_PER_SYMBOL = 100_000
+
+SYMBOLS = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+]
+
+OUTPUT_DIR = "data/ohlcv"
+
+REQUEST_SLEEP_SEC = 0.3
