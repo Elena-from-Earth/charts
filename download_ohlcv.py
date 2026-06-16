@@ -41,8 +41,8 @@ def candles_to_dataframe(candles: list) -> pd.DataFrame:
         ],
     )
 
-    df["time"] = df["time"].astype("int64")
-    df["datetime_utc"] = pd.to_datetime(df["time"], unit="ms", utc=True)
+    df["time"] = df["time"].astype("int64") // 1000
+    df["datetime_utc"] = pd.to_datetime(df["time"], unit="s", utc=True)
 
     numeric_columns = [
         "open",
@@ -143,9 +143,11 @@ def download_ohlcv(
         "%Y-%m-%d(%H-%M-%S)"
     )
 
+    bars_k = round(len(df) / 1000)
+
     filename = (
-        f"Chart-0_{symbol}_{interval}_"
-        f"{first_name}_{last_name}.csv"
+        f"{symbol}_{interval}_"
+        f"{first_name}_{last_name}_{bars_k}k.csv"
     )
     output_path = Path(OUTPUT_DIR) / filename
 
