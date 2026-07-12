@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.config import OUTPUT_DIR, REQUEST_SLEEP_SEC
+from src.config import FUNDING_OUTPUT_DIR, REQUEST_SLEEP_SEC
 from src.funding_client import fetch_funding_history
 
 
@@ -64,7 +64,7 @@ def download_funding(
         ]
     ]
 
-    output_dir = Path(OUTPUT_DIR)
+    output_dir = Path(FUNDING_OUTPUT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     first_time = df["datetime_utc"].iloc[0].strftime(
@@ -85,5 +85,9 @@ def download_funding(
 
 
 if __name__ == "__main__":
-    path, rows = download_funding("BTCUSDT")
+    symbol = input("Enter symbol: ").strip().upper()
+    if not symbol:
+        raise RuntimeError("Symbol is required")
+
+    path, rows = download_funding(symbol)
     print(f"OK: saved {rows} rows to {path}")

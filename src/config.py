@@ -13,5 +13,6 @@ SYMBOLS = [
 ]
 
 OUTPUT_DIR = "data/ohlcv"
+FUNDING_OUTPUT_DIR = "data/funding"
 
 REQUEST_SLEEP_SEC = 0.3

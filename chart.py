@@ -4,7 +4,7 @@ import tkinter as tk
 from datetime import datetime, timedelta, timezone
 from tkinter import ttk
 
-from download_ohlcv import download_ohlcv
+from src.download_ohlcv import download_ohlcv
 
 from src.config import LIMIT_PER_REQUEST, REQUEST_SLEEP_SEC
 
