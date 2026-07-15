@@ -3,5 +3,8 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+._*
+.__*
 logs/
 data/ohlcv/*.csv
+data/funding/*.csv

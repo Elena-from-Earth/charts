@@ -1,7 +1,8 @@
-# src/bitget_client.py
-
+import json
 import time
-import requests
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from src.config import BASE_URL, REQUEST_SLEEP_SEC
 
@@ -9,17 +10,32 @@ from src.config import BASE_URL, REQUEST_SLEEP_SEC
 def get_json(url: str, params: dict) -> dict:
     time.sleep(REQUEST_SLEEP_SEC)
 
-    response = requests.get(url, params=params, timeout=20)
+    request_url = f"{url}?{urlencode(params)}"
+    request = Request(
+        request_url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "charts-downloader/1.0",
+        },
+    )
 
-    if response.status_code == 403:
-        raise RuntimeError("IP blocked or access forbidden by Bitget")
+    try:
+        with urlopen(request, timeout=20) as response:
+            raw_data = response.read().decode("utf-8")
+    except HTTPError as error:
+        if error.code == 403:
+            raise RuntimeError("IP blocked or access forbidden by Bitget") from error
 
-    if response.status_code == 429:
-        raise RuntimeError("Bitget rate limit exceeded. IP may be temporarily restricted")
+        if error.code == 429:
+            raise RuntimeError(
+                "Bitget rate limit exceeded. IP may be temporarily restricted"
+            ) from error
 
-    response.raise_for_status()
+        raise RuntimeError(f"Bitget HTTP error {error.code}: {error.reason}") from error
+    except URLError as error:
+        raise RuntimeError(f"Network error while calling Bitget: {error.reason}") from error
 
-    data = response.json()
+    data = json.loads(raw_data)
 
     if data.get("code") != "00000":
         raise RuntimeError(f"Bitget API error: {data}")

@@ -1,4 +1,9 @@
+from pathlib import Path
+
+
 # src/config.py
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 BASE_URL = "https://api.bitget.com"
 
@@ -12,7 +17,8 @@ SYMBOLS = [
     "SOLUSDT",
 ]
 
-OUTPUT_DIR = "data/ohlcv"
-FUNDING_OUTPUT_DIR = "data/funding"
+OUTPUT_DIR = PROJECT_ROOT / "data" / "ohlcv"
+CONTRACTS_OUTPUT_DIR = PROJECT_ROOT / "data" / "contracts"
+FUNDING_OUTPUT_DIR = PROJECT_ROOT / "data" / "funding"
 
 REQUEST_SLEEP_SEC = 0.3

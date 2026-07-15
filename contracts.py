@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from src.bitget_client import get_json
-from src.config import BASE_URL, CATEGORY
+from src.config import BASE_URL, CATEGORY, CONTRACTS_OUTPUT_DIR
 
 
 def fetch_contract(symbol: str) -> dict:
@@ -24,7 +24,7 @@ def fetch_contract(symbol: str) -> dict:
 
 
 def save_contract(symbol: str, data: dict) -> Path:
-    output_dir = Path("data/contracts")
+    output_dir = Path(CONTRACTS_OUTPUT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     output_path = output_dir / f"{symbol}.json"

@@ -1,10 +1,9 @@
+import csv
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
-
 from src.bitget_client import fetch_history_candles
-from src.config import CATEGORY, INTERVAL, LIMIT_PER_REQUEST, OUTPUT_DIR
+from src.config import CATEGORY, LIMIT_PER_REQUEST, OUTPUT_DIR
 
 
 INTERVAL_MS = {
@@ -27,46 +26,41 @@ def now_closed_candle_ms(interval: str) -> int:
     return (now_ms // step) * step - step
 
 
-def candles_to_dataframe(candles: list) -> pd.DataFrame:
-    df = pd.DataFrame(
-        candles,
-        columns=[
-            "time",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume_base",
-            "Volume",
-        ],
-    )
+CSV_COLUMNS = [
+    "time",
+    "open",
+    "high",
+    "low",
+    "close",
+    "Volume",
+    "volume_base",
+    "datetime_utc",
+]
 
-    df["time"] = df["time"].astype("int64") // 1000
-    df["datetime_utc"] = pd.to_datetime(df["time"], unit="s", utc=True)
 
-    numeric_columns = [
-        "open",
-        "high",
-        "low",
-        "close",
-        "Volume",
-        "volume_base",
-    ]
+def candle_datetime_utc(timestamp_seconds: int) -> datetime:
+    return datetime.fromtimestamp(timestamp_seconds, timezone.utc)
 
-    for column in numeric_columns:
-        df[column] = df[column].astype(float)
 
-    return df[
-        [
-            "time",
-            "open",
-            "high",
-            "low",
-            "close",
-            "Volume",
-            "volume_base",
-            "datetime_utc",
-        ]
+def candles_to_rows(candles: list) -> list[dict]:
+    rows_by_time = {}
+
+    for candle in candles:
+        timestamp_seconds = int(candle[0]) // 1000
+        rows_by_time[timestamp_seconds] = {
+            "time": timestamp_seconds,
+            "open": float(candle[1]),
+            "high": float(candle[2]),
+            "low": float(candle[3]),
+            "close": float(candle[4]),
+            "Volume": float(candle[6]),
+            "volume_base": float(candle[5]),
+            "datetime_utc": str(candle_datetime_utc(timestamp_seconds)),
+        }
+
+    return [
+        rows_by_time[timestamp_seconds]
+        for timestamp_seconds in sorted(rows_by_time)
     ]
 
 symbol = "BTCUSDT"
@@ -126,24 +120,24 @@ def download_ohlcv(
             )
             progress_callback(min(progress, 100))
 
-    df = candles_to_dataframe(all_candles)
+    rows = candles_to_rows(all_candles)
 
-    df = (
-        df.drop_duplicates(subset=["time"])
-        .sort_values("time")
-        .reset_index(drop=True)
-    )
+    if not rows:
+        raise RuntimeError("No OHLCV data received")
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
-    first_name = df["datetime_utc"].iloc[0].strftime(
+    first_time = candle_datetime_utc(rows[0]["time"])
+    last_time = candle_datetime_utc(rows[-1]["time"])
+
+    first_name = first_time.strftime(
         "%Y-%m-%d(%H-%M-%S)"
     )
-    last_name = df["datetime_utc"].iloc[-1].strftime(
+    last_name = last_time.strftime(
         "%Y-%m-%d(%H-%M-%S)"
     )
 
-    bars_k = round(len(df) / 1000)
+    bars_k = round(len(rows) / 1000)
 
     filename = (
         f"{symbol}_{interval}_"
@@ -151,12 +145,15 @@ def download_ohlcv(
     )
     output_path = Path(OUTPUT_DIR) / filename
 
-    df.to_csv(output_path, index=False, mode="w")
+    with output_path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=CSV_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
 
     if progress_callback:
         progress_callback(100)
 
-    return output_path, len(df)
+    return output_path, len(rows)
 
 
 if __name__ == "__main__":

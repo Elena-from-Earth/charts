@@ -1,6 +1,5 @@
-import requests
-
 from src.config import BASE_URL
+from src.bitget_client import get_json
 
 
 def fetch_funding_history(
@@ -17,19 +16,5 @@ def fetch_funding_history(
         "pageSize": str(page_size),
     }
 
-    response = requests.get(url, params=params, timeout=20)
-
-    if response.status_code == 403:
-        raise RuntimeError("IP blocked or access forbidden by Bitget")
-
-    if response.status_code == 429:
-        raise RuntimeError("Bitget rate limit exceeded")
-
-    response.raise_for_status()
-
-    data = response.json()
-
-    if data.get("code") != "00000":
-        raise RuntimeError(f"Bitget API error: {data}")
-
+    data = get_json(url, params)
     return data.get("data", [])
