@@ -1,1 +1,1 @@
-# No external Python packages are required.
+certifi>=2024.2.2,<2027

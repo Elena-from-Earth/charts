@@ -1,10 +1,26 @@
 import json
+import ssl
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from src.config import BASE_URL, REQUEST_SLEEP_SEC
+
+try:
+    import certifi
+except ModuleNotFoundError:  # pragma: no cover - installation fallback
+    certifi = None
+
+
+def create_ssl_context() -> ssl.SSLContext:
+    if certifi is not None:
+        return ssl.create_default_context(cafile=certifi.where())
+
+    return ssl.create_default_context()
+
+
+SSL_CONTEXT = create_ssl_context()
 
 
 def get_json(url: str, params: dict) -> dict:
@@ -20,7 +36,7 @@ def get_json(url: str, params: dict) -> dict:
     )
 
     try:
-        with urlopen(request, timeout=20) as response:
+        with urlopen(request, context=SSL_CONTEXT, timeout=20) as response:
             raw_data = response.read().decode("utf-8")
     except HTTPError as error:
         if error.code == 403:
