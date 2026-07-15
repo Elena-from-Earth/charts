@@ -141,7 +141,7 @@ def download_ohlcv(
 
     filename = (
         f"{symbol}_{interval}_"
-        f"{first_name}_{last_name}_{bars_k}k.csv"
+        f"{bars_k}k_{first_name}_{last_name}.csv"
     )
     output_path = Path(OUTPUT_DIR) / filename
 
