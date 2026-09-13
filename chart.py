@@ -1,9 +1,11 @@
 import math
+import queue
 import threading
 import tkinter as tk
 from datetime import datetime, timedelta, timezone
 from tkinter import ttk
 
+from src import bitget_client
 from src.download_ohlcv import download_ohlcv
 
 from src.config import LIMIT_PER_REQUEST, REQUEST_SLEEP_SEC
@@ -88,17 +90,27 @@ def submit() -> None:
     progress_var.set(10)
     progress_text_var.set("10%")
     status_var.set("Downloading...")
+    download_button.state(["disabled"])
 
-    def update_progress(value: int) -> None:
-        root.after(
-            0,
-            lambda: (
-                progress_var.set(value),
-                progress_text_var.set(f"{value}%"),
-            ),
+    def update_progress(
+        value: int,
+        completed: int = 0,
+        total: int = 0,
+    ) -> None:
+        ui_events.put(("progress", value, completed, total))
+
+    def on_retry(attempt: int, error: object) -> None:
+        ui_events.put(
+            (
+                "status",
+                f"Network retry {attempt}/5: {error}",
+                0,
+                0,
+            )
         )
 
     def run_download() -> None:
+        bitget_client.retry_hook = on_retry
         try:
             output_path, rows = download_ohlcv(
                 symbol=symbol,
@@ -107,28 +119,49 @@ def submit() -> None:
                 last_bar=last_bar,
                 progress_callback=update_progress,
             )
-
-            root.after(
-                0,
-                lambda: status_var.set(
-                    f"Saved {rows:,} bars: {output_path.name}"
-                ),
+            ui_events.put(
+                (
+                    "status",
+                    f"Saved {rows:,} bars: {output_path.name}",
+                    0,
+                    0,
+                )
             )
-
         except Exception as error:
-            error_text = str(error)
-
-            root.after(
-                0,
-                lambda: status_var.set(
-                    f"Error: {error_text}"
-                ),
-            )
+            ui_events.put(("status", f"Error: {error}", 0, 0))
+        finally:
+            bitget_client.retry_hook = None
+            ui_events.put(("done", None, 0, 0))
 
     threading.Thread(
         target=run_download,
         daemon=True,
     ).start()
+
+
+def poll_ui() -> None:
+    try:
+        while True:
+            event, payload, completed, total = ui_events.get_nowait()
+
+            if event == "progress":
+                progress_var.set(payload)
+                if total:
+                    progress_text_var.set(
+                        f"{payload}%  ({completed}/{total})"
+                    )
+                else:
+                    progress_text_var.set(f"{payload}%")
+                if str(status_var.get()).startswith("Network retry"):
+                    status_var.set("Downloading...")
+            elif event == "status":
+                status_var.set(str(payload))
+            elif event == "done":
+                download_button.state(["!disabled"])
+    except queue.Empty:
+        pass
+
+    root.after(100, poll_ui)
 
 
 root = tk.Tk()
@@ -157,6 +190,7 @@ estimate_var = tk.StringVar()
 progress_var = tk.DoubleVar(value=0)
 progress_text_var = tk.StringVar(value="0%")
 status_var = tk.StringVar()
+ui_events: queue.SimpleQueue = queue.SimpleQueue()
 
 ttk.Label(root, text="Trading pair").grid(
     row=0, column=0, padx=10, pady=8, sticky="w"
@@ -217,11 +251,12 @@ ttk.Label(
     pady=(2, 5),
 )
 
-ttk.Button(
+download_button = ttk.Button(
     root,
     text="Download",
     command=submit,
-).grid(
+)
+download_button.grid(
     row=7,
     column=0,
     columnspan=2,
@@ -247,4 +282,5 @@ for variable in [
     variable.trace_add("write", update_estimate)
 
 update_estimate()
+poll_ui()
 root.mainloop()

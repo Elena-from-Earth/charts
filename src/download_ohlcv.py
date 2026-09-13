@@ -143,13 +143,23 @@ def download_ohlcv(
     all_candles = []
 
     if progress_callback:
-        progress_callback(10)
+        progress_callback(10, 0, total_requests)
 
     while cursor_ms <= end_ms:
         chunk_last_ms = min(
             cursor_ms + (LIMIT_PER_REQUEST - 1) * step_ms,
             end_ms,
         )
+
+        if progress_callback:
+            progress = 10 + int(
+                90 * completed_requests / total_requests
+            )
+            progress_callback(
+                min(progress, 99),
+                completed_requests,
+                total_requests,
+            )
 
         candles = fetch_history_candles(
             category=CATEGORY,
@@ -173,7 +183,11 @@ def download_ohlcv(
             progress = 10 + int(
                 90 * completed_requests / total_requests
             )
-            progress_callback(min(progress, 100))
+            progress_callback(
+                min(progress, 100),
+                completed_requests,
+                total_requests,
+            )
 
     rows = candles_to_rows(all_candles)
 
@@ -213,7 +227,7 @@ def download_ohlcv(
         writer.writerows(rows)
 
     if progress_callback:
-        progress_callback(100)
+        progress_callback(100, total_requests, total_requests)
 
     return output_path, len(rows)
 
